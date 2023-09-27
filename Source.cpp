@@ -88,12 +88,14 @@ uint16_t check_key()
 {
     return WaitForSingleObject(hStdin, 1000) == WAIT_OBJECT_0 && _kbhit();
 }
+
 void handle_interrupt(int signal)
 {
     restore_input_buffering();
     printf("\n");
     exit(-2);
 }
+
 uint16_t sign_extend(uint16_t x, int bit_count)
 {
     if ((x >> (bit_count - 1)) & 1) {
@@ -122,12 +124,10 @@ void update_flags(uint16_t r)
 }
 void read_image_file(FILE* file)
 {
-    /* the origin tells us where in memory to place the image */
     uint16_t origin;
     fread(&origin, sizeof(origin), 1, file);
     origin = swap16(origin);
 
-    /* we know the maximum file size so we only need one fread */
     uint16_t max_read = MEMORY_MAX - origin;
     uint16_t* p = memory + origin;
     size_t read = fread(p, sizeof(uint16_t), max_read, file);
@@ -139,6 +139,7 @@ void read_image_file(FILE* file)
         ++p;
     }
 }
+
 int read_image(const char* image_path)
 {
     FILE* file; fopen_s(&file,image_path, "rb");
@@ -190,7 +191,6 @@ int main(int argc, const char* argv[])
     signal(SIGINT, handle_interrupt);
     disable_input_buffering();
 
-    /* since exactly one condition flag should be set at any given time, set the Z flag */
     reg[R_COND] = FL_ZRO;
 
     /* set the PC to starting position */
@@ -201,7 +201,6 @@ int main(int argc, const char* argv[])
     int running = 1;
     while (running)
     {
-        /* FETCH */
         uint16_t instr = mem_read(reg[R_PC]++);
         uint16_t op = instr >> 12;
 
@@ -209,11 +208,8 @@ int main(int argc, const char* argv[])
         {
         case OP_ADD:
         {
-            /* destination register (DR) */
             uint16_t r0 = (instr >> 9) & 0x7;
-            /* first operand (SR1) */
             uint16_t r1 = (instr >> 6) & 0x7;
-            /* whether we are in immediate mode */
             uint16_t imm_flag = (instr >> 5) & 0x1;
 
             if (imm_flag)
@@ -290,7 +286,6 @@ int main(int argc, const char* argv[])
                 reg[R_PC] = reg[r1]; /* JSRR */
             }
         }
-        break;
         case OP_LD:
         {
             uint16_t r0 = (instr >> 9) & 0x7;
@@ -298,18 +293,13 @@ int main(int argc, const char* argv[])
             reg[r0] = mem_read(reg[R_PC] + pc_offset);
             update_flags(r0);
         }
-        break;
         case OP_LDI:
         {
-            /* destination register (DR) */
             uint16_t r0 = (instr >> 9) & 0x7;
-            /* PCoffset 9*/
             uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
-            /* add pc_offset to the current PC, look at that memory location to get the final address */
             reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
             update_flags(r0);
         }
-        break;
         case OP_LDR:
         {
             uint16_t r0 = (instr >> 9) & 0x7;
@@ -318,7 +308,6 @@ int main(int argc, const char* argv[])
             reg[r0] = mem_read(reg[r1] + offset);
             update_flags(r0);
         }
-        break;
         case OP_LEA:
         {
             uint16_t r0 = (instr >> 9) & 0x7;
@@ -326,21 +315,18 @@ int main(int argc, const char* argv[])
             reg[r0] = reg[R_PC] + pc_offset;
             update_flags(r0);
         }
-        break;
         case OP_ST:
         {
             uint16_t r0 = (instr >> 9) & 0x7;
             uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
             mem_write(reg[R_PC] + pc_offset, reg[r0]);
         }
-        break;
         case OP_STI:
         {
             uint16_t r0 = (instr >> 9) & 0x7;
             uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
             mem_write(mem_read(reg[R_PC] + pc_offset), reg[r0]);
         }
-        break;
         case OP_STR:
         {
             uint16_t r0 = (instr >> 9) & 0x7;
@@ -348,7 +334,6 @@ int main(int argc, const char* argv[])
             uint16_t offset = sign_extend(instr & 0x3F, 6);
             mem_write(reg[r1] + offset, reg[r0]);
         }
-        break;
         case OP_TRAP:
             reg[R_R7] = reg[R_PC];
 
